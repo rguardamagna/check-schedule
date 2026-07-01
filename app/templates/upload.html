@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<div x-data="uploader()" x-init="init()">
+    <h2 class="mb-3">Cargar XLSX</h2>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <form @submit.prevent="subir()">
+                <div class="mb-3">
+                    <label class="form-label">Archivo XLSX</label>
+                    <input type="file" class="form-control" accept=".xlsx,.xls"
+                           @change="file = $event.target.files[0]">
+                </div>
+                <button type="submit" class="btn btn-primary" :disabled="!file || cargando">
+                    <span x-show="cargando" class="spinner-border spinner-border-sm"></span>
+                    Subir
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <template x-if="resultado">
+        <div class="card">
+            <div class="card-body">
+                <h5>Resultado</h5>
+                <ul>
+                    <li><strong>Importados:</strong> <span x-text="resultado.importados"></span></li>
+                    <li><strong>Duplicados:</strong> <span x-text="resultado.duplicados"></span></li>
+                    <li><strong>Total en DB:</strong> <span x-text="resultado.total_en_db"></span></li>
+                </ul>
+
+                <template x-if="resultado.errores && resultado.errores.length">
+                    <div>
+                        <h6 class="text-danger">Errores:</h6>
+                        <ul class="text-danger">
+                            <template x-for="err in resultado.errores" :key="err.fila">
+                                <li x-text="'Fila ' + err.fila + ': ' + err.detalle"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    <div class="card mt-3">
+        <div class="card-header">Formato esperado</div>
+        <div class="card-body">
+            <p class="mb-2">Las columnas se detectan automáticamente (no importa el orden exacto).</p>
+            <table class="table table-sm table-bordered">
+                <thead><tr><th>Fecha de pago</th><th>Importe</th><th>Nombre proveedor</th><th>Estado</th></tr></thead>
+                <tbody><tr><td>15/07/2026</td><td>125000,50</td><td>Proveedor S.A.</td><td><em>(opcional)</em></td></tr></tbody>
+            </table>
+            <p class="text-muted small mb-0">
+                Formatos de fecha soportados: dd/mm/YYYY, YYYY-MM-DD, serial Excel.
+                El importe puede usar punto o coma como separador decimal.
+                La columna Estado es opcional — si se omite, todos se cargan como "pendiente".
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+function uploader() {
+    return {
+        file: null,
+        cargando: false,
+        resultado: null,
+
+        async subir() {
+            if (!this.file) return;
+            this.cargando = true;
+            this.resultado = null;
+
+            const fd = new FormData();
+            fd.append('file', this.file);
+
+            try {
+                const r = await fetch('/api/upload', { method: 'POST', body: fd });
+                this.resultado = await r.json();
+            } catch(e) {
+                this.resultado = { errores: [{fila: 0, detalle: 'Error de conexión: ' + e.message}] };
+            }
+            this.cargando = false;
+        }
+    };
+}
+</script>
+{% endblock %}

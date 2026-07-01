@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe {{ data.fecha }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; color: #333; }
+        h1 { font-size: 18px; margin-bottom: 5px; color: #111; }
+        .fecha { color: #666; margin-bottom: 20px; }
+        .total-box { font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; padding: 15px; border: 2px solid #333; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; }
+        th { background: #f5f5f5; font-weight: bold; }
+        tr:nth-child(even) { background: #fafafa; }
+        .footer { margin-top: 30px; font-size: 10px; color: #999; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+        .badge { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Informe de Cheques</h1>
+    <p class="fecha">Fecha: <strong>{{ data.fecha }}</strong></p>
+
+    {% if data.es_inhabil %}
+        <div style="background:#fff3cd; padding:15px; border-radius:8px; border:1px solid #ffc107;">
+            <strong>🚫 Día inhábil:</strong> {{ data.motivo }}
+            {% if data.proximo_habil %}
+                <br>Próximo día hábil: <strong>{{ data.proximo_habil }}</strong>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="total-box">
+            Total a pagar: ${{ "%.2f"|format(data.total_a_pagar) }}
+            <div style="font-size:14px; font-weight:normal; color:#666;">{{ data.cantidad_cheques }} cheques</div>
+        </div>
+
+        {% if data.cheques %}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:40%;">Proveedor</th>
+                    <th style="width:20%;">Importe</th>
+                    <th style="width:20%;">Vencimiento</th>
+                    <th style="width:20%;">Días</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ch in data.cheques %}
+                <tr>
+                    <td>{{ ch.proveedor }}</td>
+                    <td>${{ "%.2f"|format(ch.importe) }}</td>
+                    <td>{{ ch.fecha_vencimiento }}</td>
+                    <td>{{ ch.dias_desde_vencimiento }}d</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    {% endif %}
+
+    <div class="footer">Generado el {{ fecha_emision }} por Cheques App</div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Login — Cheques App{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header"><h4>Iniciar Sesión</h4></div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Usuario</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+                </form>
+                <hr>
+                <small class="text-muted">Dev: admin/admin · contador/contador</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

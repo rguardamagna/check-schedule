@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block content %}
+<div x-data="informes()" x-init="init()">
+    <h2 class="mb-3">Informes</h2>
+
+    <div class="row mb-3 no-print">
+        <div class="col-md-4 mb-2">
+            <label class="form-label">Fecha</label>
+            <input type="date" class="form-control" x-model="fecha" @change="cargarInforme()">
+        </div>
+        <div class="col-md-8 d-flex align-items-end gap-2 pb-1 flex-wrap">
+            <button class="btn btn-outline-primary" @click="hoy()">📅 Hoy</button>
+            <button class="btn btn-outline-info" @click="semanal()">📆 Vista semanal</button>
+            <button class="btn btn-outline-secondary" :disabled="vistaSemanal || esInhabil" @click="exportarPDF()">📄 PDF</button>
+        </div>
+    </div>
+
+    <template x-if="cargando">
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status"></div>
+            <p class="mt-2">Cargando...</p>
+        </div>
+    </template>
+
+    <!-- Vista diaria -->
+    <template x-if="!vistaSemanal && !esInhabil && !cargando">
+        <div>
+            <div class="card mb-3">
+                <div class="card-body text-center">
+                    <h5>Total a pagar al <span x-text="fecha"></span></h5>
+                    <p class="total-card" x-text="'$' + formato(total)"></p>
+                    <small class="text-muted" x-text="cantidad + ' cheques'"></small>
+                    <template x-if="proximoVencimiento">
+                        <p class="mt-2 mb-0"><small>Próximo vencimiento: <span x-text="proximoVencimiento"></span></small></p>
+                    </template>
+                </div>
+            </div>
+            <template x-if="cheques.length === 0">
+                <div class="alert alert-info">No hay cheques pendientes para esta fecha.</div>
+            </template>
+            <template x-if="cheques.length > 0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Proveedor</th>
+                                <th>Importe</th>
+                                <th>Vencimiento</th>
+                                <th>Días</th>
+                                <th>Nota</th>
+                                <th class="no-print">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="ch in cheques" :key="ch.id">
+                                <tr>
+                                    <td x-text="ch.proveedor"></td>
+                                    <td x-text="'$' + formato(ch.importe)"></td>
+                                    <td x-text="ch.fecha_vencimiento"></td>
+                                    <td x-text="ch.dias_desde_vencimiento + 'd'"></td>
+                                    <td><small x-text="ch.nota"></small></td>
+                                    <td class="no-print">
+                                        <button class="btn btn-success btn-sm"
+                                                @click="pagar(ch.id)"
+                                                :disabled="cargandoPago">Pagar</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- Inhábil -->
+    <template x-if="!vistaSemanal && esInhabil && !cargando">
+        <div class="alert alert-warning">
+            <h4>🚫 Día inhábil</h4>
+            <p x-text="'El ' + fecha + ' es ' + motivo + '. No hay cheques para pagar.'"></p>
+            <p x-show="proximoHabil"><strong>Próximo día hábil:</strong> <span x-text="proximoHabil"></span></p>
+        </div>
+    </template>
+
+    <!-- Vista semanal -->
+    <template x-if="vistaSemanal && !cargando">
+        <div>
+            <div class="card mb-3">
+                <div class="card-body text-center">
+                    <h5>Total semanal</h5>
+                    <p class="total-card" x-text="'$' + formato(totalSemanal)"></p>
+                    <small class="text-muted" x-text="totalChequesSemana + ' cheques en la semana'"></small>
+                </div>
+            </div>
+            <template x-for="dia in diasSemana" :key="dia.fecha">
+                <div class="card mb-2" :class="{'border-warning': dia.es_inhabil}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong x-text="dia.fecha"></strong>
+                        <template x-if="dia.es_inhabil">
+                            <span class="badge bg-warning text-dark">Inhábil</span>
+                        </template>
+                        <template x-if="!dia.es_inhabil">
+                            <span x-text="'$' + formato(dia.total_a_pagar)"></span>
+                        </template>
+                    </div>
+                    <div class="card-body py-2" x-show="!dia.es_inhabil && dia.cheques && dia.cheques.length">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                <template x-for="ch in dia.cheques" :key="ch.id">
+                                    <tr>
+                                        <td x-text="ch.proveedor"></td>
+                                        <td x-text="'$' + formato(ch.importe)"></td>
+                                        <td><small x-text="ch.nota"></small></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+</div>
+
+<script>
+function informes() {
+    return {
+        fecha: new Date().toISOString().split('T')[0],
+        total: 0,
+        cantidad: 0,
+        cheques: [],
+        esInhabil: false,
+        motivo: '',
+        proximoHabil: '',
+        proximoVencimiento: '',
+        vistaSemanal: false,
+        diasSemana: [],
+        totalSemanal: 0,
+        totalChequesSemana: 0,
+        cargando: false,
+        cargandoPago: false,
+
+        init() { this.cargarInforme(); },
+
+        hoy() {
+            this.fecha = new Date().toISOString().split('T')[0];
+            this.vistaSemanal = false;
+            this.cargarInforme();
+        },
+
+        semanal() {
+            this.vistaSemanal = true;
+            this.cargarSemanal();
+        },
+
+        async cargarInforme() {
+            this.cargando = true;
+            try {
+                const r = await fetch(`/api/informe?fecha=${this.fecha}`);
+                if (!r.ok) return;
+                const d = await r.json();
+                this.esInhabil = d.es_inhabil;
+                this.motivo = d.motivo || '';
+                this.proximoHabil = d.proximo_habil || '';
+                this.proximoVencimiento = d.proximo_vencimiento || '';
+                this.total = d.total_a_pagar;
+                this.cantidad = d.cantidad_cheques;
+                this.cheques = d.cheques || [];
+            } catch(e) { console.error(e); }
+            this.cargando = false;
+        },
+
+        async cargarSemanal() {
+            this.cargando = true;
+            try {
+                const r = await fetch(`/api/informe/semanal?fecha=${this.fecha}`);
+                if (!r.ok) return;
+                const d = await r.json();
+                this.diasSemana = d.dias || [];
+                this.totalSemanal = d.total_semanal;
+                this.totalChequesSemana = d.total_cheques_semana;
+            } catch(e) { console.error(e); }
+            this.cargando = false;
+        },
+
+        async pagar(id) {
+            this.cargandoPago = true;
+            await fetch(`/api/cheques/${id}/pagar`, { method: 'POST' });
+            if (this.vistaSemanal) {
+                await this.cargarSemanal();
+            } else {
+                await this.cargarInforme();
+            }
+            this.cargandoPago = false;
+        },
+
+        exportarPDF() {
+            window.open(`/informes/pdf?fecha=${this.fecha}`, '_blank');
+        },
+
+        formato(n) {
+            if (n === undefined || n === null) return '—';
+            return new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+        }
+    };
+}
+</script>
+{% endblock %}
