@@ -1,4 +1,5 @@
 import openpyxl
+import re
 from datetime import datetime, date, timedelta
 from app import db
 from app.models import Cheque
@@ -35,27 +36,29 @@ def _parsear_fecha(valor):
 
 
 def _parsear_importe(valor):
-    if isinstance(valor, (int, float)):
-        return float(valor)
     if valor is None:
         return None
+    if isinstance(valor, (int, float)):
+        return float(valor)
+
     try:
-        # Limpiar: sacar simbolo moneda, espacios, y cualquier texto
-        limpio = (
-            str(valor)
-            .replace("$", "")
-            .replace("USD", "")
-            .replace("ARS", "")
-            .replace(" ", "")
-            .strip()
-        )
-        # Formato argentino: . es separador miles, , es decimal
+        texto = str(valor).strip()
+        # Sacar TODO lo que no sea dígito, punto, coma o guión
+        limpio = re.sub(r"[^\d,.\-]", "", texto)
+        if not limpio:
+            return None
+
+        # Detecta formato argentino: la ULTIMA coma es decimal
+        # ej: "436.666,67" -> ultima coma en pos 7, ultimo punto en pos 3
+        # ej: "1250,50" -> coma pero sin punto
+        # ej: "5,000.00" -> ultimo punto despues de la coma (formato US)
         if "," in limpio and limpio.rfind(",") > limpio.rfind("."):
-            # Tiene coma como decimal: sacar puntos, cambiar coma por punto
+            # Formato argentino: . separador miles, , decimal
             limpio = limpio.replace(".", "").replace(",", ".")
         else:
-            # Formato internacional o sin decimales
+            # Formato internacional: , separador miles o sin separador
             limpio = limpio.replace(",", "")
+
         return float(limpio)
     except (ValueError, AttributeError):
         return None
