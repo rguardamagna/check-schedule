@@ -130,7 +130,17 @@ def upload():
     file.save(filepath)
 
     try:
+        import sys
         resultado = procesar_xlsx(filepath)
+        if resultado.get("errores"):
+            print(f"[UPLOAD DEBUG] Headers: ", file=sys.stderr)
+            # Loggear raw rows para debug
+            import openpyxl
+            wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+            ws = wb[wb.sheetnames[0]]
+            for i, row in enumerate(list(ws.iter_rows(values_only=True))[:5]):
+                print(f"  Raw row {i}: {[repr(c) for c in row]}", file=sys.stderr)
+            wb.close()
         return jsonify(resultado)
     except Exception as e:
         return jsonify({"error": f"Error al procesar: {str(e)}"}), 500
@@ -145,3 +155,48 @@ def upload():
 @login_required
 def listar_feriados():
     return jsonify({"feriados": sorted(list(_cargar_feriados()))})
+
+
+@api_bp.route("/debug-xlsx", methods=["POST"])
+@login_required
+def debug_xlsx():
+    """Lee el XLSX y muestra las celdas CRUDAS como las ve openpyxl."""
+    if "file" not in request.files:
+        return jsonify({"error": "No se envió archivo"}), 400
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "Archivo sin nombre"}), 400
+
+    import openpyxl
+    import json
+
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+    file.save(filepath)
+
+    try:
+        wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+        ws = wb[wb.sheetnames[0]]
+        rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+
+        debug = []
+        for i, row in enumerate(rows):
+            celdas = []
+            for j, val in enumerate(row):
+                celdas.append({
+                    "col": j,
+                    "valor_raw": repr(val),
+                    "tipo": type(val).__name__,
+                    "str_repr": str(val) if val is not None else None,
+                })
+            debug.append({"fila": i, "celdas": celdas})
+
+        return jsonify({"sheet": wb.sheetnames[0], "total_filas": len(rows), "debug": debug})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            os.remove(filepath)
+        except OSError:
+            pass
