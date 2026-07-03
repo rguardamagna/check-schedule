@@ -37,8 +37,26 @@ def _parsear_fecha(valor):
 def _parsear_importe(valor):
     if isinstance(valor, (int, float)):
         return float(valor)
+    if valor is None:
+        return None
     try:
-        return float(str(valor).replace(".", "").replace(",", ".").strip())
+        # Limpiar: sacar simbolo moneda, espacios, y cualquier texto
+        limpio = (
+            str(valor)
+            .replace("$", "")
+            .replace("USD", "")
+            .replace("ARS", "")
+            .replace(" ", "")
+            .strip()
+        )
+        # Formato argentino: . es separador miles, , es decimal
+        if "," in limpio and limpio.rfind(",") > limpio.rfind("."):
+            # Tiene coma como decimal: sacar puntos, cambiar coma por punto
+            limpio = limpio.replace(".", "").replace(",", ".")
+        else:
+            # Formato internacional o sin decimales
+            limpio = limpio.replace(",", "")
+        return float(limpio)
     except (ValueError, AttributeError):
         return None
 
