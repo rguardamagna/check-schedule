@@ -53,7 +53,7 @@
                         </thead>
                         <tbody>
                             <template x-for="ch in cheques" :key="ch.id">
-                                <tr>
+                                <tr :class="{'fila-en-riesgo': esEnRiesgo(ch)}">
                                     <td x-text="ch.proveedor"></td>
                                     <td x-text="'$' + formato(ch.importe)"></td>
                                     <td x-text="ch.fecha_vencimiento"></td>
@@ -107,7 +107,7 @@
                         <table class="table table-sm mb-0">
                             <tbody>
                                 <template x-for="ch in dia.cheques" :key="ch.id">
-                                    <tr>
+                                    <tr :class="{'fila-en-riesgo': esEnRiesgo(ch)}">
                                         <td x-text="ch.proveedor"></td>
                                         <td x-text="'$' + formato(ch.importe)"></td>
                                         <td><small x-text="ch.nota"></small></td>
@@ -201,6 +201,14 @@ function informes() {
         formato(n) {
             if (n === undefined || n === null) return '—';
             return new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+        },
+
+        esEnRiesgo(ch) {
+            if (ch.estado !== 'pendiente') return false;
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            const venc = new Date(ch.fecha_vencimiento + 'T00:00:00');
+            return venc < hoy;
         }
     };
 }

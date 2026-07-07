@@ -2,7 +2,7 @@ services:
   cheques-app:
     build: .
     ports:
-      - "5000:5000"
+      - "9001:9001"
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
